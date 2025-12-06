@@ -1,0 +1,16 @@
+[Unit]
+Description=Aethra node
+After=network.target
+
+[Service]
+Type=simple
+User=aethra
+WorkingDirectory=/home/aethra/aethra
+Environment=PORT=3000
+Environment=P2P_PORT=6001
+ExecStart=/usr/bin/node /home/aethra/aethra/src/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

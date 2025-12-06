@@ -1,0 +1,16 @@
+[Unit]
+Description=Aethra node
+After=network.target
+
+[Service]
+Type=simple
+User={{ aethra_user }}
+WorkingDirectory={{ app_dir }}
+Environment=PORT={{ node_port }}
+Environment=P2P_PORT={{ p2p_port }}
+ExecStart=/usr/bin/node {{ app_dir }}/src/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

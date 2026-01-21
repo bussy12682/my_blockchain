@@ -1,0 +1,38 @@
+{
+  "name": "aethra",
+  "version": "1.0.0",
+  "description": "Aethra — a minimal, clear, and modular educational blockchain (PoW) implementation with a simple node + API, CLI, and tests.",
+  "main": "src/index.js",
+  "bin": {
+    "aethra": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "cli": "node src/cli.js",
+    "demo": "node examples/demo.js",
+    "test": "jest --runInBand",
+    "lint": "eslint . || true"
+  },
+  "author": "Aethra Contributors",
+  "keywords": ["blockchain","aethra","pow","education","demo"],
+  "repository": {
+    "type": "git",
+    "url": "https://example.com/aethra.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "axios": "^1.4.0",
+    "elliptic": "^6.5.4",
+    "ws": "^8.13.0",
+    "level": "^7.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "eslint": "^8.48.0"
+  }
+}

@@ -1,0 +1,50 @@
+#cloud-config
+# Example cloud-init for Ubuntu 22.04 to provision an Aethra node
+# Replace <REPO_URL> with your git repo URL and optionally provide GENESIS_URL
+
+packages:
+  - git
+  - curl
+  - ca-certificates
+  - build-essential
+
+runcmd:
+  - |-
+    # variables
+    REPO_URL="<REPO_URL>"  # replace with your repo (e.g., https://github.com/you/aethra.git)
+    APP_DIR="/home/ubuntu/aethra"
+    GENESIS_URL="<GENESIS_URL>"  # optional: public URL to download genesis-export.json
+
+    # clone repo
+    if [ ! -d "$APP_DIR" ]; then
+      git clone "$REPO_URL" "$APP_DIR"
+      chown -R ubuntu:ubuntu "$APP_DIR"
+    fi
+
+    # install Node.js 18
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    apt-get install -y nodejs
+
+    # install app deps
+    cd "$APP_DIR"
+    sudo -u ubuntu npm ci --only=production || true
+
+    # download genesis if provided
+    if [ -n "$GENESIS_URL" ] && [ "$GENESIS_URL" != "<GENESIS_URL>" ]; then
+      mkdir -p data
+      curl -fsSL "$GENESIS_URL" -o data/genesis-export.json
+      sudo -u ubuntu node scripts/import-genesis.js || true
+    fi
+
+    # install systemd unit (use provided template)
+    if [ -f "$APP_DIR/scripts/aethra.service.template" ]; then
+      sed -e "s|WorkingDirectory=.*|WorkingDirectory=$APP_DIR|" \
+          -e "s|Environment=PORT=.*|Environment=PORT=3000|" \
+          -e "s|Environment=P2P_PORT=.*|Environment=P2P_PORT=6001|" "$APP_DIR/scripts/aethra.service.template" > /etc/systemd/system/aethra.service
+      systemctl daemon-reload
+      systemctl enable aethra.service
+      systemctl restart aethra.service || true
+    fi
+
+    # done
+    echo "Aethra provisioning complete" > /var/log/aethra_provision.log

@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+  node1:
+    build: .
+    container_name: aethra_node1
+    environment:
+      - PORT=3000
+      - P2P_PORT=7100
+      - HOST=0.0.0.0
+    ports:
+      - "3000:3000"
+      - "7100:7100"
+    volumes:
+      - ./data_node1:/usr/src/app/data
+
+  node2:
+    build: .
+    container_name: aethra_node2
+    environment:
+      - PORT=3001
+      - P2P_PORT=7101
+      - HOST=0.0.0.0
+    ports:
+      - "3001:3001"
+      - "7101:7101"
+    volumes:
+      - ./data_node2:/usr/src/app/data
+
+  node3:
+    build: .
+    container_name: aethra_node3
+    environment:
+      - PORT=3002
+      - P2P_PORT=7102
+      - HOST=0.0.0.0
+    ports:
+      - "3002:3002"
+      - "7102:7102"
+    volumes:
+      - ./data_node3:/usr/src/app/data

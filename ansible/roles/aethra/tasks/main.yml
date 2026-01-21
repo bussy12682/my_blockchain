@@ -1,0 +1,94 @@
+---
+- name: Ensure apt cache is up to date
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install required packages
+  apt:
+    name:
+      - git
+      - curl
+      - ca-certificates
+      - build-essential
+    state: present
+
+- name: Add NodeSource Node.js 18 repository
+  shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+  args:
+    warn: false
+  changed_when: false
+  register: nodesource
+
+- name: Install nodejs
+  apt:
+    name: nodejs
+    state: present
+  when: nodesource is not failed
+
+- name: Create aethra user
+  user:
+    name: "{{ aethra_user }}"
+    system: no
+    shell: /bin/bash
+    create_home: yes
+
+- name: Ensure app directory exists
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ aethra_user }}"
+    group: "{{ aethra_user }}"
+    mode: '0755'
+
+- name: Clone repo
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_dir }}"
+    version: HEAD
+    update: yes
+    force: yes
+  become_user: "{{ aethra_user }}"
+
+- name: Ensure data directory exists
+  file:
+    path: "{{ app_dir }}/data"
+    state: directory
+    owner: "{{ aethra_user }}"
+    group: "{{ aethra_user }}"
+    mode: '0755'
+
+- name: Copy genesis-export.json (if provided on control node)
+  copy:
+    src: "{{ genesis_src }}"
+    dest: "{{ app_dir }}/data/genesis-export.json"
+    owner: "{{ aethra_user }}"
+    group: "{{ aethra_user }}"
+  when: genesis_src is defined and genesis_src != ''
+
+- name: Install npm dependencies (production)
+  npm:
+    path: "{{ app_dir }}"
+    production: yes
+  become_user: "{{ aethra_user }}"
+
+- name: Deploy systemd service from template
+  template:
+    src: "aethra.service.j2"
+    dest: "/etc/systemd/system/aethra.service"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+
+- name: Ensure service enabled and started
+  systemd:
+    name: aethra.service
+    enabled: yes
+    state: restarted
+
+- name: Import genesis if present
+  become_user: "{{ aethra_user }}"
+  shell: node scripts/import-genesis.js || true
+  args:
+    chdir: "{{ app_dir }}"

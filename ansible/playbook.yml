@@ -1,0 +1,15 @@
+Remove-NetFirewallRule -DisplayName "Aethra REST (3000)"
+Remove-NetFirewallRule -DisplayName "Aethra P2P (7100)"---
+- name: Provision Aethra seed nodes
+  hosts: aethra_nodes
+  become: true
+  vars:
+    repo_url: "https://example.com/your/aethra.git"  # override with -e repo_url=...
+    app_dir: "/home/aethra/aethra"
+    aethra_user: "aethra"
+    genesis_src: "./data/genesis-export.json"     # path on control node; override with -e genesis_src=...
+    node_port: 3000
+    p2p_port: 7100
+    host_bind: "0.0.0.0"
+  roles:
+    - aethra

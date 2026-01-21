@@ -1,0 +1,137 @@
+#cloud-config
+# Aethra Mainnet Seed Node Provisioning
+# Usage: Paste this into your VPS provider's user-data/cloud-init field when creating a new VM
+# Tested on: Ubuntu 22.04 LTS, Ubuntu 20.04 LTS
+
+packages:
+  - git
+  - curl
+  - ca-certificates
+  - ufw
+  - build-essential
+  - jq
+
+runcmd:
+  - |
+    set -e
+    export DEBIAN_FRONTEND=noninteractive
+    
+    # Variables
+    APP_DIR="/home/ubuntu/aethra"
+    REPO_URL="https://github.com/DulanjaliSenarathna/mern-food-delivery-app.git"
+    PORT=3000
+    P2P_PORT=7100
+    HOST=0.0.0.0
+    
+    echo "=== Aethra Mainnet Seed Node Setup ==="
+    
+    # Clone repo
+    echo "Cloning Aethra repository..."
+    if [ ! -d "$APP_DIR" ]; then
+      sudo -u ubuntu git clone "$REPO_URL" "$APP_DIR" 2>&1 | head -20
+      cd "$APP_DIR/frontend/ARCANE/project_1/aethra" || exit 1
+    fi
+    
+    AETHRA_PATH="$APP_DIR/frontend/ARCANE/project_1/aethra"
+    cd "$AETHRA_PATH"
+    
+    # Install Node.js 18
+    echo "Installing Node.js 18..."
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - > /dev/null 2>&1
+    apt-get install -y nodejs > /dev/null 2>&1
+    node --version
+    
+    # Install app dependencies
+    echo "Installing npm dependencies..."
+    sudo -u ubuntu npm ci --only=production 2>&1 | tail -5
+
+    # Configure simple firewall (UFW) to allow required ports
+    echo "Configuring UFW firewall: allow 22, 3000, 7100..."
+    ufw allow OpenSSH
+    ufw allow 3000/tcp
+    ufw allow 7100/tcp
+    ufw --force enable
+    
+    # Create aethra systemd user and service directory
+    mkdir -p /home/ubuntu/.config/systemd/user
+    chown -R ubuntu:ubuntu /home/ubuntu/.config
+    
+    # Generate systemd service
+    echo "Installing systemd service..."
+    # Create data directory
+    mkdir -p "$AETHRA_PATH/data"
+    chown -R ubuntu:ubuntu "$AETHRA_PATH/data"
+    
+    # Ensure genesis-export.json exists (should be in repo)
+    if [ -f "$AETHRA_PATH/data/genesis-export.json" ]; then
+      echo "Found genesis-export.json in repo; importing..."
+      sudo -u ubuntu node "$AETHRA_PATH/scripts/import-genesis.js" || true
+    else
+      echo "WARNING: genesis-export.json not found; node will create genesis on first run"
+    fi
+    
+    # Install systemd service (use updated P2P port and host)
+    echo "Installing systemd service..."
+    cat > /etc/systemd/system/aethra.service <<'EOF'
+  [Unit]
+  Description=Aethra Mainnet Seed Node
+  After=network.target
+
+  [Service]
+  Type=simple
+  User=ubuntu
+  WorkingDirectory=/home/ubuntu/aethra/frontend/ARCANE/project_1/aethra
+  Environment=PORT=3000
+  Environment=P2P_PORT=7100
+  Environment=HOST=0.0.0.0
+  ExecStart=/usr/bin/node /home/ubuntu/aethra/frontend/ARCANE/project_1/aethra/src/server.js
+  Restart=on-failure
+  RestartSec=10
+  StandardOutput=journal
+  StandardError=journal
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+
+    # Enable and start service
+    echo "Enabling and starting Aethra service..."
+    systemctl daemon-reload
+    systemctl enable aethra.service
+    systemctl restart aethra.service
+    
+    # Wait for node to start
+    sleep 5
+    
+    # Verify node is running
+    echo "=== Aethra Mainnet Seed Node is Live ==="
+    echo "Node status: $(systemctl is-active aethra.service)"
+    echo "Check logs: journalctl -u aethra.service -f"
+    echo "HTTP API: http://localhost:3000 (replace 'localhost' with your public IP)"
+    echo "P2P listening on: 6001"
+    
+    # Print seed address (for sharing with other nodes)
+    sleep 3
+    echo "Node is ready. Share this seed address:"
+    PUBLIC_IP=$(curl -s https://api.ipify.org || echo "your-public-ip")
+    echo "ws://$PUBLIC_IP:7100"
+
+final_message: |
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║           Aethra Mainnet Seed Node Live                       ║
+  ╠═══════════════════════════════════════════════════════════════╣
+  ║ Node is running as systemd service 'aethra.service'           ║
+  ║                                                               ║
+  ║ Check status:                                                ║
+  ║   systemctl status aethra.service                            ║
+  ║   journalctl -u aethra.service -f                            ║
+  ║                                                               ║
+  ║ HTTP API (localhost):                                        ║
+  ║   curl http://localhost:3000/status                          ║
+  ║   curl http://localhost:3000/chain                           ║
+  ║                                                               ║
+  ║ Share your seed address:                                    ║
+  ║   ws://<YOUR-PUBLIC-IP>:7100                                ║
+  ║                                                               ║
+  ║ Next: Connect other nodes to this seed, or start mining.    ║
+  ╚═══════════════════════════════════════════════════════════════╝
